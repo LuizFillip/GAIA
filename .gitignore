@@ -1,0 +1,5 @@
+/data/*
+*.nc
+*.pdf
+/src/__pycache__/*
+/__pycache__/*
