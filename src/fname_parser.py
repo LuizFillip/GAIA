@@ -1,7 +1,8 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu May 16 14:59:22 2024
+import datetime as dt 
 
-@author: Luiz
-"""
+
+infile = 'GAIA/data/'
+
+file = 'ti20130101cpl.nc'
+
 

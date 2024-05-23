@@ -1,42 +1,21 @@
 import FluxTube as ft
-import xarray as xr 
 import GEO as gg
 import numpy as np
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
 import pandas as pd
 from tqdm import tqdm 
-
-
-def plot_map(dsi, glon, glat):
-    
-
-    fig, ax = plt.subplots(
-          figsize = (10, 10), 
-          ncols = 1,
-          dpi = 300, 
-          subplot_kw = 
-          {'projection': ccrs.PlateCarree()}
-          )
-    
-    gg.map_attrs(
-        ax, 
-        year, 
-        grid = False,
-        degress = None
-        )
-    
-    ax.contourf(dsi['lon'], dsi['lat'], dsi['ti'], 30, cmap = 'jet')
-    
-    ax.plot(glon, glat, lw = 2)
-
+import xarray as xr 
+import datetime as dt 
+import os 
 
 def closest_value(values_list, target):
     return min(values_list, key = lambda x: abs(x - target))
 
-
-
-def fluxtube_coordinates(apex, year = 2013, site = 'saa', points = 50):
+def fluxtube_coordinates(
+        apex, 
+        year = 2013, 
+        site = 'saa', 
+        points = 50
+        ):
     
     apx = ft.Apex(apex)
     
@@ -63,7 +42,8 @@ def interpolate_data(ds):
     new_lat = np.linspace(ds.lat[0], ds.lat[-1], 180)
     new_alt = np.linspace(ds.lvl[0], ds.lvl[-1], 50)
     
-    return ds.interp(lat = new_lat, lon = new_lon, lvl = new_alt)
+    return ds.interp(
+        lat = new_lat, lon = new_lon, lvl = new_alt)
 
 
 def get_parameter_along_line(ds, apex, parameter = 'ti'):
@@ -128,41 +108,72 @@ def get_in_time(ds, apex, parameter = 'ti'):
     out = []
     
     
-    for time in tqdm(ds['time'].values, str(apex)):
+    for time in ds['time'].values:
     
         out.append(get_parameter_along_line(
             ds.sel(time = time), apex, parameter))
         
     return pd.concat(out)
 
+
+def load_dataset(infile):
+    ds = xr.open_dataset(infile)
+    
+    ds = ds.where(ds['lvl'] < 320, drop=True)
+    return ds
+
+def get_parameter_name(file):
+    
+    f = file.split('.')[0]
+    
+    parameter = f[:-11]
+    
+    date_str = f.replace(parameter, '')[:-3]
+    date = dt.datetime.strptime(date_str, '%Y%m%d')
+    return parameter, date
+
+
+
 def run_in_apex(
-        ds,
-        parameter = 'ti',
+        infile,
+        file,
         amin = 280, 
         amax = 320, 
         step = 10
         ):
     
-    out = [] 
+    ds = load_dataset(infile + file)
     
-    for apex in np.arange(amin, amax + step, step):
+    parameter, date = get_parameter_name(file)
+    out = [] 
+    heights = np.arange(amin, amax + step, step)
+    for apex in tqdm(heights, parameter):
         out.append(get_in_time(ds, apex, parameter))
     
+    df = pd.concat(out).set_index('time')
+    return df 
+
+infile = 'GAIA/data/netcdfs/'
+
+
+def running(infile):
     
-    return pd.concat(out)
+    
+    for file in os.listdir(infile):
+        
+        
+        df = run_in_apex(infile, file)
+        
+        file_to_save = file.replace('nc', '')
+        
+        df.to_csv('GAIA/data/fluxtube/' + file_to_save)
+        
+        
+# running(infile)
 
+file = 'te20130101cpl.nc'
+df = run_in_apex(infile, file)
 
+file_to_save = file.replace('nc', '')
 
-infile = 'GAIA/data/'
-
-file = 'ti20130101cpl.nc'
-
-
-year = 2013
-ds = xr.open_dataset(infile + file)
-
-ds = ds.where(ds['lvl'] < 320, drop=True)
-
-
-df = run_in_apex(ds)
-
+df.to_csv('GAIA/data/fluxtube/' + file_to_save)
